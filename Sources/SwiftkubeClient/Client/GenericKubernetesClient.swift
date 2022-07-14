@@ -519,4 +519,32 @@ public extension GenericKubernetesClient {
 		task.schedule(in: TimeAmount.zero)
 		return task
 	}
+
+	func suspend(
+		in namespace: NamespaceSelector,
+		name: String
+	) throws -> EventLoopFuture<Resource> {
+		do {
+			let eventLoop = httpClient.eventLoopGroup.next()
+			let request = try makeRequest().in(namespace).toPatch().resource(withName: name).setBooleanPatchRFC6902(value: true, "/spec/suspend").build()
+
+			return dispatch(request: request, eventLoop: eventLoop)
+		} catch {
+			return httpClient.eventLoopGroup.next().makeFailedFuture(error)
+		}
+	}
+
+	func unsuspend(
+		in namespace: NamespaceSelector,
+		name: String
+	) throws -> EventLoopFuture<Resource> {
+		do {
+			let eventLoop = httpClient.eventLoopGroup.next()
+			let request = try makeRequest().in(namespace).toPatch().resource(withName: name).setBooleanPatchRFC6902(value: false, "/spec/suspend").build()
+
+			return dispatch(request: request, eventLoop: eventLoop)
+		} catch {
+			return httpClient.eventLoopGroup.next().makeFailedFuture(error)
+		}
+	}
 }

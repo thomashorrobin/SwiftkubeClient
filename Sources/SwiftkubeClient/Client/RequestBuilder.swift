@@ -78,6 +78,7 @@ internal protocol MethodStep {
 	func toFollow(pod: String, container: String?) -> GetStep
 	func toPost() -> PostStep
 	func toPut() -> PutStep
+	func toPatch() -> PatchStep
 	func toDelete() -> DeleteStep
 	func toLogs(pod: String, container: String?) -> GetStep
 }
@@ -104,6 +105,14 @@ internal protocol PostStep {
 internal protocol PutStep {
 	func resource(withName name: String?) -> PutStep
 	func body(_ body: RequestBody) -> PutStep
+	func build() throws -> HTTPClient.Request
+}
+
+// MARK: - PatchStep
+
+internal protocol PatchStep {
+	func resource(withName name: String?) -> PatchStep
+	func setBooleanPatchRFC6902(value v: Bool, _ path: String) -> PatchStep
 	func build() throws -> HTTPClient.Request
 }
 
@@ -148,6 +157,8 @@ internal class RequestBuilder {
 		}
 	}
 
+	var patchBody: replaceBooleanRFC6902?
+
 	var subResourceType: ResourceType?
 
 	var containerName: String?
@@ -155,6 +166,7 @@ internal class RequestBuilder {
 	var readOptions: [ReadOption]?
 	var deleteOptions: meta.v1.DeleteOptions?
 	var watchFlag = false
+	var followFlag = false
 
 	init(config: KubernetesClientConfig, gvr: GroupVersionResource) {
 		self.config = config
@@ -201,6 +213,13 @@ extension RequestBuilder: MethodStep {
 		return self as PutStep
 	}
 
+	/// Set request method to  PATCH for the pending request
+	/// - Returns:The builder instance as PatchStep
+	func toPatch() -> PatchStep {
+		method = .PATCH
+		return self as PatchStep
+	}
+
 	/// Set request method to  DELETE for the pending request
 	/// - Returns:The builder instance as DeleteStep
 	func toDelete() -> DeleteStep {
@@ -223,6 +242,7 @@ extension RequestBuilder: MethodStep {
 		resourceName = pod
 		containerName = container
 		subResourceType = .log
+		followFlag = true
 		return self as GetStep
 	}
 
@@ -306,7 +326,37 @@ extension RequestBuilder: PutStep {
 	}
 }
 
-// MARK: DeleteStep
+// MARK: - replaceBooleanRFC6902
+
+struct replaceBooleanRFC6902: Codable {
+	var op: String = "replace"
+	let path: String
+	let value: Bool
+}
+
+// MARK: - RequestBuilder + PatchStep
+
+extension RequestBuilder: PatchStep {
+
+	/// Set the name of the resource for the pending request
+	/// - Parameter name: The name of the resource
+	/// - Returns: The builder instance as PatchStep
+	func resource(withName name: String?) -> PatchStep {
+		resourceName = name
+		return self as PatchStep
+	}
+
+	/// Set the body payload for the pending request
+	/// - Parameter value: The value that will replace the current value
+	/// - Parameter path: The path to the value to be changed
+	/// - Returns: The builder instance as PatchStep
+	func setBooleanPatchRFC6902(value: Bool, _ path: String) -> PatchStep {
+		patchBody = replaceBooleanRFC6902(path: path, value: value)
+		return self as PatchStep
+	}
+}
+
+// MARK: - RequestBuilder + DeleteStep
 
 extension RequestBuilder: DeleteStep {
 
@@ -362,7 +412,7 @@ internal extension RequestBuilder {
 			add(queryItem: URLQueryItem(name: "watch", value: "true"))
 		}
 
-		if subResourceType == .log {
+		if followFlag {
 			add(queryItem: URLQueryItem(name: "follow", value: "true"))
 		}
 
@@ -408,6 +458,9 @@ internal extension RequestBuilder {
 		if let authorizationHeader = authentication?.authorizationHeader() {
 			headers.append(("Authorization", authorizationHeader))
 		}
+		if method == .PATCH {
+			headers.append(("Content-Type", "application/json-patch+json"))
+		}
 
 		return HTTPHeaders(headers)
 	}
@@ -423,6 +476,11 @@ internal extension RequestBuilder {
 
 		if let options = deleteOptions {
 			let data = try encoder.encode(options)
+			return .data(data)
+		}
+
+		if let patchBody = patchBody {
+			let data = try encoder.encode([patchBody])
 			return .data(data)
 		}
 

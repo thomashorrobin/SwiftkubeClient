@@ -79,6 +79,22 @@ final class RequestBuilderTests: XCTestCase {
 		XCTAssertEqual(request?.url, URL(string: "https://kubernetesmaster/api/v1/namespaces/kube-system/pods/pod/log?follow=true&container=container")!)
 		XCTAssertEqual(request?.method, HTTPMethod.GET)
 	}
+	
+	func testLogsInNamespace() {
+		let builder = RequestBuilder(config: config, gvr: gvr)
+		let request = try? builder.in(.system).toLogs(pod: "pod", container: nil).build()
+
+		XCTAssertEqual(request?.url, URL(string: "https://kubernetesmaster/api/v1/namespaces/kube-system/pods/pod/log")!)
+		XCTAssertEqual(request?.method, HTTPMethod.GET)
+	}
+	
+	func testLogsWithContainerInNamespace() {
+		let builder = RequestBuilder(config: config, gvr: gvr)
+		let request = try? builder.in(.system).toLogs(pod: "pod", container: "container").build()
+
+		XCTAssertEqual(request?.url, URL(string: "https://kubernetesmaster/api/v1/namespaces/kube-system/pods/pod/log?container=container")!)
+		XCTAssertEqual(request?.method, HTTPMethod.GET)
+	}
 
 	func testGetWithListOptions_Eq() {
 		let builder = RequestBuilder(config: config, gvr: gvr)
@@ -239,5 +255,14 @@ final class RequestBuilderTests: XCTestCase {
 
 		XCTAssertEqual(request?.url, URL(string: "https://kubernetesmaster/api/v1/namespaces/default/pods/test/scale")!)
 		XCTAssertEqual(request?.method, HTTPMethod.PUT)
+	}
+	
+	func testPatchCronjobScheduleInNamespace() {
+		gvr = GroupVersionResource(of: batch.v1.CronJob.self)!
+		let builder = RequestBuilder(config: config, gvr: gvr)
+		let request = try? builder.in(.default).toPatch().resource(withName: "cronjob123").setBooleanPatchRFC6902(value: true, "/spec/suspend").build()
+
+		XCTAssertEqual(request?.url, URL(string: "https://kubernetesmaster/apis/batch/v1/namespaces/default/cronjobs/cronjob123")!)
+		XCTAssertEqual(request?.method, HTTPMethod.PATCH)
 	}
 }
