@@ -299,3 +299,9 @@ public extension NamespacedGenericKubernetesClient where Resource: ScalableResou
 		try super.updateScale(in: namespace ?? .namespace(config.namespace), name: name, scale: scale)
 	}
 }
+
+public extension NamespacedGenericKubernetesClient where Resource: MetadataHavingResource {
+	func deleteLabel(in namespace: NamespaceSelector? = nil, name: String, labelName: String) throws -> EventLoopFuture<Resource> {
+		try super.deleteLabel(in: namespace ?? .namespace(config.namespace), name: name, label: labelName)
+	}
+}
