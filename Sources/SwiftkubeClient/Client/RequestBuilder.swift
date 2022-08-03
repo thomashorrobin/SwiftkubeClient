@@ -350,7 +350,7 @@ struct removeBooleanRFC6902: Codable {
 struct addMapRFC6902: Codable {
 	var op: String = "add"
 	let path: String
-	let value: [String:String]
+	let value: String
 }
 
 // MARK: - RequestBuilder + PatchStep
@@ -380,7 +380,7 @@ extension RequestBuilder: PatchStep {
 	}
 	
 	func setLabelAddRFC6902(name: String, value: String) -> PatchStep {
-		patchBody2 = addMapRFC6902(path: "/metadata/labels", value: [name : value])
+		patchBody2 = addMapRFC6902(path: "/metadata/labels/" + name, value: value)
 		return self as PatchStep
 	}
 }
