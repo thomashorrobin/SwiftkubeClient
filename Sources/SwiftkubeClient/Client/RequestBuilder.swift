@@ -114,6 +114,7 @@ internal protocol PatchStep {
 	func resource(withName name: String?) -> PatchStep
 	func setBooleanPatchRFC6902(value v: Bool, _ path: String) -> PatchStep
 	func setLabelRemoveRFC6902(name: String) -> PatchStep
+	func setLabelAddRFC6902(name: String, value: String) -> PatchStep
 	func build() throws -> HTTPClient.Request
 }
 
@@ -160,6 +161,7 @@ internal class RequestBuilder {
 
 	var patchBody: removeBooleanRFC6902?
 	var patchBody1: replaceBooleanRFC6902?
+	var patchBody2: addMapRFC6902?
 
 	var subResourceType: ResourceType?
 
@@ -343,6 +345,14 @@ struct removeBooleanRFC6902: Codable {
 	let path: String
 }
 
+// MARK: - removeBooleanRFC6902
+
+struct addMapRFC6902: Codable {
+	var op: String = "add"
+	let path: String
+	let value: [String:String]
+}
+
 // MARK: - RequestBuilder + PatchStep
 
 extension RequestBuilder: PatchStep {
@@ -366,6 +376,11 @@ extension RequestBuilder: PatchStep {
 	
 	func setLabelRemoveRFC6902(name: String) -> PatchStep {
 		patchBody = removeBooleanRFC6902(path: "/metadata/labels/" + name)
+		return self as PatchStep
+	}
+	
+	func setLabelAddRFC6902(name: String, value: String) -> PatchStep {
+		patchBody2 = addMapRFC6902(path: "/metadata/labels", value: [name : value])
 		return self as PatchStep
 	}
 }
@@ -498,6 +513,9 @@ internal extension RequestBuilder {
 			return .data(data)
 		} else if let patchBody1 = patchBody1 {
 			let data = try encoder.encode([patchBody1])
+			return .data(data)
+		} else if let patchBody2 = patchBody2 {
+			let data = try encoder.encode([patchBody2])
 			return .data(data)
 		}
 

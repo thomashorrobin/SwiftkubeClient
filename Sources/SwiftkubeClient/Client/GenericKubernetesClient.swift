@@ -558,4 +558,15 @@ public extension GenericKubernetesClient {
 			return httpClient.eventLoopGroup.next().makeFailedFuture(error)
 		}
 	}
+	
+	func addLabel(in namespace: NamespaceSelector, name: String, label: String, value: String) throws -> EventLoopFuture<Resource> {
+		do {
+			let eventLoop = httpClient.eventLoopGroup.next()
+			let request = try makeRequest().in(namespace).toPatch().resource(withName: name).setLabelAddRFC6902(name: label, value: value).build()
+
+			return dispatch(request: request, eventLoop: eventLoop)
+		} catch {
+			return httpClient.eventLoopGroup.next().makeFailedFuture(error)
+		}
+	}
 }
