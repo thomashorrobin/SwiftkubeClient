@@ -407,6 +407,28 @@ internal extension GenericKubernetesClient {
 
 		return eventLoop.makeSucceededFuture(.resource(logs))
 	}
+	
+	func deleteLabel(in namespace: NamespaceSelector, name: String, label: String) throws -> EventLoopFuture<Resource> {
+		do {
+			let eventLoop = httpClient.eventLoopGroup.next()
+			let request = try makeRequest().in(namespace).toPatch().resource(withName: name).setLabelRemoveRFC6902(name: label).build()
+
+			return dispatch(request: request, eventLoop: eventLoop)
+		} catch {
+			return httpClient.eventLoopGroup.next().makeFailedFuture(error)
+		}
+	}
+	
+	func addLabel(in namespace: NamespaceSelector, name: String, label: String, value: String) throws -> EventLoopFuture<Resource> {
+		do {
+			let eventLoop = httpClient.eventLoopGroup.next()
+			let request = try makeRequest().in(namespace).toPatch().resource(withName: name).setLabelAddRFC6902(name: label, value: value).build()
+
+			return dispatch(request: request, eventLoop: eventLoop)
+		} catch {
+			return httpClient.eventLoopGroup.next().makeFailedFuture(error)
+		}
+	}
 }
 
 public extension GenericKubernetesClient {
@@ -541,28 +563,6 @@ public extension GenericKubernetesClient {
 		do {
 			let eventLoop = httpClient.eventLoopGroup.next()
 			let request = try makeRequest().in(namespace).toPatch().resource(withName: name).setBooleanPatchRFC6902(value: false, "/spec/suspend").build()
-
-			return dispatch(request: request, eventLoop: eventLoop)
-		} catch {
-			return httpClient.eventLoopGroup.next().makeFailedFuture(error)
-		}
-	}
-	
-	func deleteLabel(in namespace: NamespaceSelector, name: String, label: String) throws -> EventLoopFuture<Resource> {
-		do {
-			let eventLoop = httpClient.eventLoopGroup.next()
-			let request = try makeRequest().in(namespace).toPatch().resource(withName: name).setLabelRemoveRFC6902(name: label).build()
-
-			return dispatch(request: request, eventLoop: eventLoop)
-		} catch {
-			return httpClient.eventLoopGroup.next().makeFailedFuture(error)
-		}
-	}
-	
-	func addLabel(in namespace: NamespaceSelector, name: String, label: String, value: String) throws -> EventLoopFuture<Resource> {
-		do {
-			let eventLoop = httpClient.eventLoopGroup.next()
-			let request = try makeRequest().in(namespace).toPatch().resource(withName: name).setLabelAddRFC6902(name: label, value: value).build()
 
 			return dispatch(request: request, eventLoop: eventLoop)
 		} catch {
