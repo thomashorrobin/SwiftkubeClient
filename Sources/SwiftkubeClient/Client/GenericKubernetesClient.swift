@@ -419,10 +419,10 @@ internal extension GenericKubernetesClient {
 		}
 	}
 	
-	func setLabels(in namespace: NamespaceSelector, name: String, label: String, value: [String:String]) throws -> EventLoopFuture<Resource> {
+	func setLabels(in namespace: NamespaceSelector, name: String, value: [String:String]) throws -> EventLoopFuture<Resource> {
 		do {
 			let eventLoop = httpClient.eventLoopGroup.next()
-			let request = try makeRequest().in(namespace).toPatch().resource(withName: name).setLabelAddRFC6902(name: label, value: value).build()
+			let request = try makeRequest().in(namespace).toPatch().resource(withName: name).setLabelAddRFC6902(value: value).build()
 
 			return dispatch(request: request, eventLoop: eventLoop)
 		} catch {
