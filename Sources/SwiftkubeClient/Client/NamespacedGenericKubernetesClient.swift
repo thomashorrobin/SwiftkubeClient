@@ -304,7 +304,7 @@ public extension NamespacedGenericKubernetesClient where Resource: MetadataHavin
 	func deleteLabel(in namespace: NamespaceSelector? = nil, name: String, labelName: String) throws -> EventLoopFuture<Resource> {
 		try super.deleteLabel(in: namespace ?? .namespace(config.namespace), name: name, label: labelName)
 	}
-	func addLabel(in namespace: NamespaceSelector? = nil, name: String, labelName: String, value: String) throws -> EventLoopFuture<Resource> {
-		try super.addLabel(in: namespace ?? .namespace(config.namespace), name: name, label: labelName, value: value)
+	func setLabels(in namespace: NamespaceSelector? = nil, name: String, labelName: String, value: [String:String]) throws -> EventLoopFuture<Resource> {
+		try super.setLabels(in: namespace ?? .namespace(config.namespace), name: name, label: labelName, value: value)
 	}
 }

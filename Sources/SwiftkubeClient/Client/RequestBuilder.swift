@@ -114,7 +114,7 @@ internal protocol PatchStep {
 	func resource(withName name: String?) -> PatchStep
 	func setBooleanPatchRFC6902(value v: Bool, _ path: String) -> PatchStep
 	func setLabelRemoveRFC6902(name: String) -> PatchStep
-	func setLabelAddRFC6902(name: String, value: String) -> PatchStep
+	func setLabelAddRFC6902(name: String, value: [String:String]) -> PatchStep
 	func build() throws -> HTTPClient.Request
 }
 
@@ -350,7 +350,7 @@ struct removeBooleanRFC6902: Codable {
 struct addMapRFC6902: Codable {
 	var op: String = "add"
 	let path: String
-	let value: String
+	let value: [String:String]
 }
 
 // MARK: - RequestBuilder + PatchStep
@@ -379,7 +379,7 @@ extension RequestBuilder: PatchStep {
 		return self as PatchStep
 	}
 	
-	func setLabelAddRFC6902(name: String, value: String) -> PatchStep {
+	func setLabelAddRFC6902(name: String, value: [String:String]) -> PatchStep {
 		patchBody2 = addMapRFC6902(path: "/metadata/labels/" + name, value: value)
 		return self as PatchStep
 	}
