@@ -80,7 +80,7 @@ internal protocol MethodStep {
 	func toPut() -> PutStep
 	func toPatch() -> PatchStep
 	func toDelete() -> DeleteStep
-	func toLogs(pod: String, container: String?) -> GetStep
+	func toLogs(pod: String, container: String?, tail: Int?) -> GetStep
 }
 
 // MARK: - GetStep
@@ -171,6 +171,7 @@ internal class RequestBuilder {
 	var deleteOptions: meta.v1.DeleteOptions?
 	var watchFlag = false
 	var followFlag = false
+	var tailLines: Int?
 
 	init(config: KubernetesClientConfig, gvr: GroupVersionResource) {
 		self.config = config
@@ -250,11 +251,12 @@ extension RequestBuilder: MethodStep {
 		return self as GetStep
 	}
 
-	func toLogs(pod: String, container: String?) -> GetStep {
+	func toLogs(pod: String, container: String?, tail: Int?) -> GetStep {
 		method = .GET
 		resourceName = pod
 		containerName = container
 		subResourceType = .log
+		tailLines = tail
 		return self as GetStep
 	}
 }
@@ -447,6 +449,10 @@ internal extension RequestBuilder {
 
 		if let container = containerName {
 			add(queryItem: URLQueryItem(name: "container", value: container))
+		}
+		
+		if let tailLines = tailLines {
+			add(queryItem: URLQueryItem(name: "tailLines", value: String(tailLines)))
 		}
 
 		guard let url = components?.url?.absoluteString else {

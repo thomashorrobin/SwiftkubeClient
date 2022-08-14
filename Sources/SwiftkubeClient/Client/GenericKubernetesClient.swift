@@ -248,10 +248,10 @@ public extension GenericKubernetesClient where Resource: ScalableResource {
 // MARK: - GenericKubernetesClient - logs
 
 internal extension GenericKubernetesClient {
-	func logs(in namespace: NamespaceSelector, name: String, container: String?) throws -> EventLoopFuture<String> {
+	func logs(in namespace: NamespaceSelector, name: String, container: String?, tailLines: Int?) throws -> EventLoopFuture<String> {
 		do {
 			let eventLoop = httpClient.eventLoopGroup.next()
-			let request = try makeRequest().in(namespace).toLogs(pod: name, container: container).subResource(.log).build()
+			let request = try makeRequest().in(namespace).toLogs(pod: name, container: container, tail: tailLines).subResource(.log).build()
 
 			return dispatchText(request: request, eventLoop: eventLoop)
 		} catch {

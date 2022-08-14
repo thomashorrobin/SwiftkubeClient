@@ -82,7 +82,7 @@ final class RequestBuilderTests: XCTestCase {
 	
 	func testLogsInNamespace() {
 		let builder = RequestBuilder(config: config, gvr: gvr)
-		let request = try? builder.in(.system).toLogs(pod: "pod", container: nil).build()
+		let request = try? builder.in(.system).toLogs(pod: "pod", container: nil, tail: nil).build()
 
 		XCTAssertEqual(request?.url, URL(string: "https://kubernetesmaster/api/v1/namespaces/kube-system/pods/pod/log")!)
 		XCTAssertEqual(request?.method, HTTPMethod.GET)
@@ -90,9 +90,17 @@ final class RequestBuilderTests: XCTestCase {
 	
 	func testLogsWithContainerInNamespace() {
 		let builder = RequestBuilder(config: config, gvr: gvr)
-		let request = try? builder.in(.system).toLogs(pod: "pod", container: "container").build()
+		let request = try? builder.in(.system).toLogs(pod: "pod", container: "container", tail: nil).build()
 
 		XCTAssertEqual(request?.url, URL(string: "https://kubernetesmaster/api/v1/namespaces/kube-system/pods/pod/log?container=container")!)
+		XCTAssertEqual(request?.method, HTTPMethod.GET)
+	}
+	
+	func testLogsInNamespaceWithTail() {
+		let builder = RequestBuilder(config: config, gvr: gvr)
+		let request = try? builder.in(.system).toLogs(pod: "pod", container: nil, tail: 10).build()
+
+		XCTAssertEqual(request?.url, URL(string: "https://kubernetesmaster/api/v1/namespaces/kube-system/pods/pod/log?tailLines=10")!)
 		XCTAssertEqual(request?.method, HTTPMethod.GET)
 	}
 
