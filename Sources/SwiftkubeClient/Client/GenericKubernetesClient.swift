@@ -433,6 +433,7 @@ internal extension GenericKubernetesClient {
 	func restartDeployment(in namespace: NamespaceSelector, name: String) throws -> EventLoopFuture<Resource> {
 		do {
 			let eventLoop = httpClient.eventLoopGroup.next()
+			// FIXME: this will override all annotations on the deployment which is probably not what we want
 			let request = try makeRequest().in(namespace).toPatch().resource(withName: name).restartDeploymentPatchRequest().build()
 
 			return dispatch(request: request, eventLoop: eventLoop)
