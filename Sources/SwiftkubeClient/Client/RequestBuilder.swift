@@ -115,6 +115,7 @@ internal protocol PatchStep {
 	func setBooleanPatchRFC6902(value v: Bool, _ path: String) -> PatchStep
 	func setLabelRemoveRFC6902(name: String) -> PatchStep
 	func setLabelAddRFC6902(value: [String:String]) -> PatchStep
+	func restartDeploymentPatchRequest() -> PatchStep
 	func build() throws -> HTTPClient.Request
 }
 
@@ -162,6 +163,7 @@ internal class RequestBuilder {
 	var patchBody: removeBooleanRFC6902?
 	var patchBody1: replaceBooleanRFC6902?
 	var patchBody2: addMapRFC6902?
+	var patchBody3: addMapRFC6902?
 
 	var subResourceType: ResourceType?
 
@@ -385,6 +387,12 @@ extension RequestBuilder: PatchStep {
 		patchBody2 = addMapRFC6902(path: "/metadata/labels", value: value)
 		return self as PatchStep
 	}
+	
+	func restartDeploymentPatchRequest() -> PatchStep {
+		let formatter = ISO8601DateFormatter()
+		patchBody3 = addMapRFC6902(path: "/spec/template/metadata/annotations", value: ["kubectl.kubernetes.io/restartedAt":formatter.string(from: Date())])
+		return self as PatchStep
+	}
 }
 
 // MARK: - RequestBuilder + DeleteStep
@@ -522,6 +530,9 @@ internal extension RequestBuilder {
 			return .data(data)
 		} else if let patchBody2 = patchBody2 {
 			let data = try encoder.encode([patchBody2])
+			return .data(data)
+		} else if let patchBody3 = patchBody3 {
+			let data = try encoder.encode([patchBody3])
 			return .data(data)
 		}
 

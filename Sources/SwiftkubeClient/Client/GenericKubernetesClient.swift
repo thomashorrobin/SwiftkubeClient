@@ -429,6 +429,17 @@ internal extension GenericKubernetesClient {
 			return httpClient.eventLoopGroup.next().makeFailedFuture(error)
 		}
 	}
+	
+	func restartDeployment(in namespace: NamespaceSelector, name: String) throws -> EventLoopFuture<Resource> {
+		do {
+			let eventLoop = httpClient.eventLoopGroup.next()
+			let request = try makeRequest().in(namespace).toPatch().resource(withName: name).restartDeploymentPatchRequest().build()
+
+			return dispatch(request: request, eventLoop: eventLoop)
+		} catch {
+			return httpClient.eventLoopGroup.next().makeFailedFuture(error)
+		}
+	}
 }
 
 public extension GenericKubernetesClient {
