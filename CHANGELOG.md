@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.13.0
+
+### New
+
+- Use structured concurrency instead of EventLoops for watching resources #25
+
+### Fixes
+
+- Fix client crash in `GenericKubernetesClient.prepareDecoder` due to decoder instance being shared #24
+ 
+### Breaking Changes
+
+- Drop AnyKubernetesAPIResource in favour of UnstructuredResource
+- The generic client for a given `GroupVersionResource` uses `UnstructuredResource` for unknown types:
+  - `KubernetesClient/``for``(gvr:) -> GenericKubernetesClient<AnyKubernetesAPIResource>` is replaced with:
+  - `KubernetesClient/``for``(gvr:) -> GenericKubernetesClient<UnstructuredResource>`
+- The `SwiftkubeClientTask` returned by the `watch` and `follow` API must be started explicitly
+- The `SwiftkubeClientTask` returns an `AsyncThrowingStream` instead of using a callback delegate 
+
+## 0.12.0
+
+### New
+
+- Update to Kubernetes model v1.24.8
+- Update dependencies
+  - Async HTTP Client 1.13.1
+  - SwiftkubeModel 0.6.0
+  - SwiftLog 1.4.4
+  - SwiftMetrics 2.3.3
+  - SwiftNIO 2.46.0
+  - Yams 5.0.1
+- Update k3s docker image to k3s:v1.24.8-k3s1
+- Add configurable timeout and redirect config for the underlying HTTPClient by @octo47
+- Update documentation comments
+
+### Breaking Changes
+
+- Raise minimum supported Swift version to 5.5
+- Replace `EventLoops` with `async/await` style API
+
+## 0.11.0
+
+### New
+
+- Update to Kubernetes model v1.22.7
+- Add option to retrieve logs once without watching / streaming (#14) by @thomashorrobin
+- Add discovery API to load server resources
+- Use SwiftkubeModel v0.5.0
+- Refactor client to use `GroupVersionResource` instead of `GroupVersionKind` for resource type resolution
+- Support creating a parametrised generic client given a `GroupVersionResource`
+- Make `GenericKubernetesClient` extensions public
+- Update k3s docker image to k3s:v1.22.7-k3s1
+
+### Fixes
+
+- Typo in property name for storage.v1 API Group (#11) by @portellaa
+- Add explicit dependency on NIO (#12) by @t089 
+
 ## 0.10.0
 
 ### New

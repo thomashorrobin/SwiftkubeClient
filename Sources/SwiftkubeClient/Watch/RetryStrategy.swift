@@ -57,7 +57,7 @@ public struct RetryStrategy: Sequence {
 		}
 	}
 
-	/// Defined the backoff behaviour between each retry attempt.
+	/// Defines the backoff behaviour between each retry attempt.
 	public enum Backoff {
 		/// No backoff.
 		case none
@@ -83,7 +83,7 @@ public struct RetryStrategy: Sequence {
 	/// The initial delay before the first retry attempt.
 	public let initialDelay: TimeInterval
 
-	/// A jitter value that is applied to each computed delay to prevent conjestion.
+	/// A jitter value that is applied to each computed delay to prevent congestion.
 	public let jitter: Double
 
 	/// A retry policy.

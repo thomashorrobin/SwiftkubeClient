@@ -26,14 +26,14 @@ public class ClusterScopedGenericKubernetesClient<Resource: KubernetesAPIResourc
 
 // MARK: - ReadableResource
 
-/// API functions for `ReadableResources`.
+/// API functions for ``ReadableResource``.
 public extension ClusterScopedGenericKubernetesClient where Resource: ReadableResource {
 
 	/// Loads an API resource by name.
 	///
 	/// - Parameters:
 	///     - name: The name of the API resource to load.
-	///     - options: A list of `ReadOptions` to apply to this request.
+	///     - options: A list of ``ReadOptions`` to apply to this request.
 	///
 	/// - Returns: The API resource specified by the given name.
 	func get(name: String, options: [ReadOption]? = nil) async throws -> Resource {
@@ -42,50 +42,33 @@ public extension ClusterScopedGenericKubernetesClient where Resource: ReadableRe
 
 	/// Watches cluster-scoped resources.
 	///
-	/// Watching resources opens a persistent connection to the API server. The connection is represented by a `HTTPClient.Task` instance, that acts
-	/// as an active "subscription" to the events stream. The task can be cancelled any time to stop the watch.
+	/// Watching resources opens a persistent connection to the API server. The connection is represented by a
+	/// ``SwiftkubeClientTask`` instance, that acts as an active "subscription" to the events stream.
+	///
+	/// The task instance must be started explicitly via ``SwiftkubeClientTask/start()``, which returns an
+	/// ``AsyncThrowingStream``, that begins yielding events immediately as they are received from the Kubernetes API server.
+	///
+	/// The async stream buffers its results if there are no active consumers. The ``AsyncThrowingStream.BufferingPolicy.unbounded``
+	/// buffering policy is used, which should be taken into consideration.
+	///
+	/// The task can be cancelled by calling its ``SwiftkubeClientTask/cancel()`` function.
+	///
+	/// Example:
 	///
 	/// ```swift
-	/// let task: HTTPClient.Task<Void> = client.namespaces.watch() { (event, namespace) in
-	///    print("\(event): \(namespace)")
-	///	}
-	///
-	///	task.cancel()
+	/// let task = try client.nodes.watch(in: .default)
+	/// let stream = task.start()
+	/// for try await item in stream {
+	///   print(item)
+	/// }
 	/// ```
 	///
-	/// - Parameters:
-	///     - options: A list of `ReadOptions` to apply to this request.
-	///     - retryStrategy: A strategy to control the reconnect behaviour.
-	///     - eventHandler: A `ResourceWatchCallback.EventHandler` instance, which is used as a callback for new events.
-	///      The clients sends each event paired with the corresponding resource as a pair to the `eventHandler`.
+	/// The task is executed indefinitely. Upon encountering non-transient errors this tasks reconnects to the
+	/// Kubernetes API server, basically restarting the previous ``GenericKubernetesClient/watch(in:options:retryStrategy:)``
+	/// or ``GenericKubernetesClient/follow(in:name:container:retryStrategy:)`` call.
 	///
-	/// - Returns: A cancellable `HTTPClient.Task` instance, representing a streaming connection to the API server.
-	func watch(
-		options: [ListOption]? = nil,
-		retryStrategy: RetryStrategy = RetryStrategy(),
-		eventHandler: @escaping ResourceWatcherCallback<Resource>.EventHandler
-	) throws -> SwiftkubeClientTask {
-		let delegate = ResourceWatcherCallback<Resource>(onError: nil, onEvent: eventHandler)
-		return try watch(options: options, retryStrategy: retryStrategy, delegate: delegate)
-	}
-
-	/// Watches cluster-scoped resources.
-	///
-	/// Watching resources opens a persistent connection to the API server. The connection is represented by a `HTTPClient.Task` instance, that acts
-	/// as an active "subscription" to the events stream. The task can be cancelled any time to stop the watch.
-	///
-	/// ```swift
-	/// let task: HTTPClient.Task<Void> = client.namespaces.watch() { (event, namespace) in
-	///    print("\(event): \(namespace)")
-	///	}
-	///
-	///	task.cancel()
-	/// ```
-	///  The reconnect behaviour can be controlled by passing an instance of `RetryStrategy`. The default is 10 retry attempts with a fixed 5 seconds
-	///  delay between each attempt. The initial delay is one second. A jitter of 0.2 seconds is applied.
-	///
-	/// The reconnect behaviour can be controlled by passing an instance of `RetryStrategy`. The default is 10 retry attempts with a fixed 5 seconds
-	/// delay between each attempt. The initial delay is one second. A jitter of 0.2 seconds is applied.
+	/// The reconnect behaviour can be controlled by passing an instance of ``RetryStrategy``. The default is 10 retry
+	/// attempts with a fixed 5 seconds delay between each attempt. The initial delay is one second. A jitter of 0.2 seconds is applied.
 	///
 	/// ```swift
 	/// let strategy = RetryStrategy(
@@ -94,36 +77,33 @@ public extension ClusterScopedGenericKubernetesClient where Resource: ReadableRe
 	///    initialDelay = 5.0,
 	///    jitter = 0.2
 	/// )
-	/// let task = client.pods.watch(in: .default, retryStrategy: strategy) { (event, pod) in print(pod) }
+	/// let task = try client.pods.watch(in: .default, retryStrategy: strategy)
 	/// ```
 	///
 	/// - Parameters:
-	///     - options: A list of `ReadOptions` to apply to this request.
-	///     - retryStrategy: A strategy to control the reconnect behaviour.
-	///     - delegate: An ResourceWatcherDelegate instance, which is used as a callback for new events.
-	///          The clients sends each event paired with the corresponding resource as a pair to the `eventHandler`.
-	///          Errors are sent to the `errorHandler`.
+	///   - namespace: The namespace for this API request.
+	///   - options: ``ListOption`` to filter/select the returned objects.
+	///   - retryStrategy: A strategy to control the reconnect behaviour.
 	///
-	/// - Returns: A cancellable `HTTPClient.Task` instance, representing a streaming connection to the API server.
-	func watch<Delegate: ResourceWatcherDelegate>(
+	/// - Returns: A ``SwiftkubeClientTask`` instance, representing a streaming connection to the API server.
+	func watch(
 		options: [ListOption]? = nil,
-		retryStrategy: RetryStrategy = RetryStrategy(),
-		delegate: Delegate
-	) throws -> SwiftkubeClientTask where Delegate.Resource == Resource {
-		try super.watch(in: .allNamespaces, options: options, retryStrategy: retryStrategy, using: delegate)
+		retryStrategy: RetryStrategy = RetryStrategy()
+	) throws -> SwiftkubeClientTask<WatchEvent<Resource>> {
+		try super.watch(in: .allNamespaces, options: options, retryStrategy: retryStrategy)
 	}
 }
 
 // MARK: - ListableResource
 
-/// API functions for `ListableResource`.
+/// API functions for ``ListableResource``.
 public extension ClusterScopedGenericKubernetesClient where Resource: ListableResource {
 
 	/// Lists the collection of API resources.
 	///
-	/// - Parameter options: `ListOptions` instance to control the behaviour of the `List` operation.
+	/// - Parameter options: ``ListOptions`` instance to control the behaviour of the `List` operation.
 	///
-	/// - Returns: A `KubernetesAPIResourceList` of resources.
+	/// - Returns: A ``KubernetesAPIResourceList`` of resources.
 	func list(options: [ListOption]? = nil) async throws -> Resource.List {
 		try await super.list(in: .allNamespaces, options: options)
 	}
@@ -136,18 +116,18 @@ public extension ClusterScopedGenericKubernetesClient where Resource: CreatableR
 
 	/// Creates an API resource.
 	///
-	/// - Parameter resource: A `KubernetesAPIResource` instance to create.
+	/// - Parameter resource: A ``KubernetesAPIResource`` instance to create.
 	///
-	/// - Returns: The created `KubernetesAPIResource`.
+	/// - Returns: The created ``KubernetesAPIResource``.
 	func create(_ resource: Resource) async throws -> Resource {
 		try await super.create(in: .allNamespaces, resource)
 	}
 
 	/// Creates an API resource.
 	///
-	/// - Parameter block: A closure block, which creates a `KubernetesAPIResource` instance to send to the server.
+	/// - Parameter block: A closure block, which creates a ``KubernetesAPIResource`` instance to send to the server.
 	///
-	/// - Returns: The created `KubernetesAPIResource`.
+	/// - Returns: The created ``KubernetesAPIResource``.
 	func create(_ block: () -> Resource) async throws -> Resource {
 		try await super.create(in: .allNamespaces, block())
 	}
@@ -160,9 +140,9 @@ public extension ClusterScopedGenericKubernetesClient where Resource: Replaceabl
 
 	/// Replaces, i.e. updates, an API resource with the given instance.
 	///
-	/// - Parameter resource: A `KubernetesAPIResource` instance to update.
+	/// - Parameter resource: A ``KubernetesAPIResource`` instance to update.
 	///
-	/// - Returns: The updated `KubernetesAPIResource`.
+	/// - Returns: The updated ``KubernetesAPIResource``.
 	func update(_ resource: Resource) async throws -> Resource {
 		try await super.update(in: .allNamespaces, resource)
 	}
@@ -170,16 +150,15 @@ public extension ClusterScopedGenericKubernetesClient where Resource: Replaceabl
 
 // MARK: - DeletableResource
 
-/// API functions for `DeletableResource`.
+/// API functions for ``DeletableResource``.
 public extension ClusterScopedGenericKubernetesClient where Resource: DeletableResource {
 
 	/// Deletes an API resource by its name.
 	///
 	/// - Parameters:
 	///   - name: The name of the resource.
-	///   - options: An instance of `meta.v1.DeleteOptions` to control the behaviour of the `Delete` operation.
+	///   - options: An instance of ``meta.v1.DeleteOptions`` to control the behaviour of the `Delete` operation.
 	///
-	/// - Returns: A `ResourceOrStatus` instance.
 	func delete(name: String, options: meta.v1.DeleteOptions? = nil) async throws {
 		try await super.delete(in: .allNamespaces, name: name, options: options)
 	}
@@ -187,12 +166,11 @@ public extension ClusterScopedGenericKubernetesClient where Resource: DeletableR
 
 // MARK: - CollectionDeletableResource
 
-/// API functions for `CollectionDeletableResource`.
+/// API functions for ``CollectionDeletableResource``.
 public extension ClusterScopedGenericKubernetesClient where Resource: CollectionDeletableResource {
 
 	/// Deletes all API resources in the target collection.
 	///
-	/// - Returns: A `ResourceOrStatus` instance.
 	func deleteAll() async throws {
 		try await super.deleteAll(in: .allNamespaces)
 	}
@@ -200,7 +178,7 @@ public extension ClusterScopedGenericKubernetesClient where Resource: Collection
 
 // MARK: - StatusHavingResource
 
-/// API functions for `StatusHavingResource`.
+/// API functions for ``StatusHavingResource``.
 public extension ClusterScopedGenericKubernetesClient where Resource: StatusHavingResource {
 
 	/// Loads an API resource's status by name.
@@ -219,7 +197,7 @@ public extension ClusterScopedGenericKubernetesClient where Resource: StatusHavi
 	///   - name: The name of the resoruce to update.
 	///   - resource: A `KubernetesAPIResource` instance to update.
 	///
-	/// - Returns: The updated `KubernetesAPIResource`.
+	/// - Returns: The updated ``KubernetesAPIResource``.
 	func updateStatus(name: String, _ resource: Resource) async throws -> Resource {
 		try await super.updateStatus(in: .allNamespaces, name: name, resource)
 	}
@@ -227,7 +205,7 @@ public extension ClusterScopedGenericKubernetesClient where Resource: StatusHavi
 
 // MARK: - ScalableResource
 
-/// API functions for `ScalableResource`.
+/// API functions for ``ScalableResource``.
 public extension ClusterScopedGenericKubernetesClient where Resource: ScalableResource {
 
 	/// Loads an API resource's scale by name.
@@ -235,7 +213,7 @@ public extension ClusterScopedGenericKubernetesClient where Resource: ScalableRe
 	/// - Parameters:
 	///   - name: The name of the API resource to load.
 	///
-	/// - Returns: The `autoscaling.v1.Scale` of the resource specified by the given name.
+	/// - Returns: The ``autoscaling.v1.Scale`` of the resource specified by the given name.
 	func getScale(name: String) async throws -> autoscaling.v1.Scale {
 		try await super.getScale(in: .allNamespaces, name: name)
 	}
@@ -244,10 +222,10 @@ public extension ClusterScopedGenericKubernetesClient where Resource: ScalableRe
 	///
 	/// - Parameters:
 	///   - name: The name of the resource to update.
-	///   - scale: An instance of a `autoscaling.v1.Scale` object to apply to the resource.
-	///   - resource: A `autoscaling.v1.Scale` instance to update.
+	///   - scale: An instance of a ``autoscaling.v1.Scale`` object to apply to the resource.
+	///   - resource: A ``autoscaling.v1.Scale`` instance to update.
 	///
-	/// - Returns: The updated `autoscaling.v1.Scale`.
+	/// - Returns: The updated ``autoscaling.v1.Scale``.
 	func updateScale(name: String, scale: autoscaling.v1.Scale) async throws -> autoscaling.v1.Scale {
 		try await super.updateScale(in: .allNamespaces, name: name, scale: scale)
 	}

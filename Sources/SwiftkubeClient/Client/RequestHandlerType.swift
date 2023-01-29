@@ -18,6 +18,7 @@ import AsyncHTTPClient
 import Foundation
 import Logging
 import NIO
+import NIOFoundationCompat
 import SwiftkubeModel
 
 // MARK: - RequestHandlerType
@@ -28,8 +29,6 @@ internal protocol RequestHandlerType {
 	var config: KubernetesClientConfig { get }
 	var jsonDecoder: JSONDecoder { get }
 	var logger: Logger { get }
-
-	func prepareDecoder(_ decoder: JSONDecoder)
 }
 
 // MARK: - RequestHandlerType + Prepare
@@ -50,7 +49,7 @@ internal extension RequestHandlerType {
 
 		do {
 			let response = try await httpClient.execute(clientRequest, timeout: config.timeout.read ?? .seconds(30), logger: logger)
-			KubernetesClient.updateSucessMetrics(startTime: startTime, request: request, response: response)
+			KubernetesClient.updateSuccessMetrics(startTime: startTime, request: request, response: response)
 
 			let expectedBytes = response.headers.first(name: "content-length").flatMap(Int.init)
 
@@ -75,8 +74,6 @@ internal extension RequestHandlerType {
 				throw SwiftkubeClientError.statusError(status)
 			}
 
-			prepareDecoder(jsonDecoder)
-
 			guard let resource = try? jsonDecoder.decode(T.self, from: data) else {
 				throw SwiftkubeClientError.decodingError("Couldn't decode response")
 			}
@@ -94,7 +91,7 @@ internal extension RequestHandlerType {
 
 		do {
 			let response = try await httpClient.execute(clientRequest, timeout: config.timeout.read ?? .seconds(30), logger: logger)
-			KubernetesClient.updateSucessMetrics(startTime: startTime, request: request, response: response)
+			KubernetesClient.updateSuccessMetrics(startTime: startTime, request: request, response: response)
 
 			let expectedBytes = response.headers.first(name: "content-length").flatMap(Int.init)
 

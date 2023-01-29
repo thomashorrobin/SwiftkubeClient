@@ -26,40 +26,53 @@ public class NamespacedGenericKubernetesClient<Resource: KubernetesAPIResource &
 
 // MARK: - ReadableResource
 
-/// API functions for `ReadableResources`.
+/// API functions for ``ReadableResources``.
 public extension NamespacedGenericKubernetesClient where Resource: ReadableResource {
 
 	/// Loads an API resource by name in the given namespace.
 	///
-	/// If the namespace is not specified then the default namespace defined in the `KubernetesClientConfig` will be used instead.
+	/// If the namespace is not specified then the default namespace defined in the ``KubernetesClientConfig`` will be used instead.
 	///
 	/// - Parameters:
 	///   - namespace: The namespace for this API request.
 	///   - name: The name of the API resource to load.
-	///   - options: A list of `ReadOptions` to apply to this request.
+	///   - options: ``ReadOptions`` to apply to this request.
 	///
 	/// - Returns: The API resource specified by the given name in the given namespace.
+	/// - Throws: An error of type ``SwiftkubeClientError``.
 	func get(in namespace: NamespaceSelector? = nil, name: String, options: [ReadOption]? = nil) async throws -> Resource {
 		try await super.get(in: namespace ?? .namespace(config.namespace), name: name, options: options)
 	}
 
 	/// Watches the API resources in the given namespace.
 	///
-	/// Watching resources opens a persistent connection to the API server. The connection is represented by a `HTTPClient.Task` instance, that acts
-	/// as an active "subscription" to the events stream. The task can be cancelled any time to stop the watch.
+	/// Watching resources opens a persistent connection to the API server. The connection is represented by a
+	/// ``SwiftkubeClientTask`` instance, that acts as an active "subscription" to the events stream.
 	///
-	/// If the namespace is not specified then the default namespace defined in the `KubernetesClientConfig` will be used instead.
+	/// The task instance must be started explicitly via ``SwiftkubeClientTask/start()``, which returns an
+	/// ``AsyncThrowingStream``, that begins yielding events immediately as they are received from the Kubernetes API server.
+	///
+	/// The async stream buffers its results if there are no active consumers. The ``AsyncThrowingStream.BufferingPolicy.unbounded``
+	/// buffering policy is used, which should be taken into consideration.
+	///
+	/// The task can be cancelled by calling its ``SwiftkubeClientTask/cancel()`` function.
+	///
+	/// Example:
 	///
 	/// ```swift
-	/// let task: HTTPClient.Task<Void> = client.pods.watch(in: .namespace("default")) { (event, pod) in
-	///    print("\(event): \(pod)")
-	///	}
-	///
-	///	task.cancel()
+	/// let task = try client.pods.watch(in: .default)
+	/// let stream = task.start()
+	/// for try await item in stream {
+	///   print(item)
+	/// }
 	/// ```
 	///
-	/// The reconnect behaviour can be controlled by passing an instance of `RetryStrategy`. The default is 10 retry attempts with a fixed 5 seconds
-	/// delay between each attempt. The initial delay is one second. A jitter of 0.2 seconds is applied.
+	/// The task is executed indefinitely. Upon encountering non-transient errors this tasks reconnects to the
+	/// Kubernetes API server, basically restarting the previous ``GenericKubernetesClient/watch(in:options:retryStrategy:)``
+	/// or ``GenericKubernetesClient/follow(in:name:container:retryStrategy:)`` call.
+	///
+	/// The reconnect behaviour can be controlled by passing an instance of ``RetryStrategy``. The default is 10 retry
+	/// attempts with a fixed 5 seconds delay between each attempt. The initial delay is one second. A jitter of 0.2 seconds is applied.
 	///
 	/// ```swift
 	/// let strategy = RetryStrategy(
@@ -68,67 +81,24 @@ public extension NamespacedGenericKubernetesClient where Resource: ReadableResou
 	///    initialDelay = 5.0,
 	///    jitter = 0.2
 	/// )
-	/// let task = client.pods.watch(in: .default, retryStrategy: strategy) { (event, pod) in print(pod) }
+	/// let task = try client.pods.watch(in: .default, retryStrategy: strategy)
 	/// ```
 	///
 	/// - Parameters:
 	///   - namespace: The namespace for this API request.
-	///   - options: A list of `ReadOptions` to apply to this request.
+	///   - options: ``ListOption`` to filter/select the returned objects.
 	///   - retryStrategy: A strategy to control the reconnect behaviour.
-	///   - eventHandler: A `ResourceWatcherCallback.EventHandler` closure, which is used as a callback for new events. The clients sends each
-	/// event paired with the corresponding resource as a pair to the `eventHandler`.
 	///
-	/// - Returns: A cancellable `HTTPClient.Task` instance, representing a streaming connection to the API server.
+	/// - Returns: A ``SwiftkubeClientTask`` instance, representing a streaming connection to the API server.
 	func watch(
 		in namespace: NamespaceSelector? = nil,
 		options: [ListOption]? = nil,
-		retryStrategy: RetryStrategy = RetryStrategy(),
-		eventHandler: @escaping ResourceWatcherCallback<Resource>.EventHandler
-	) throws -> SwiftkubeClientTask {
-		let delegate = ResourceWatcherCallback<Resource>(onError: nil, onEvent: eventHandler)
-		return try watch(in: namespace, options: options, retryStrategy: retryStrategy, delegate: delegate)
-	}
-
-	/// Watches the API resources in the given namespace.
-	///
-	/// Watching resources opens a persistent connection to the API server. The connection is represented by a `HTTPClient.Task` instance, that acts
-	/// as an active "subscription" to the events stream. The task can be cancelled any time to stop the watch.
-	///
-	/// If the namespace is not specified then the default namespace defined in the `KubernetesClientConfig` will be used instead.
-	///
-	/// The reconnect behaviour can be controlled by passing an instance of `RetryStrategy`. The default is 10 retry attempts with a fixed 5 seconds
-	/// delay between each attempt. The initial delay is one second. A jitter of 0.2 seconds is applied.
-	///
-	/// ```swift
-	/// let strategy = RetryStrategy(
-	///    policy: .maxAttempts(20),
-	///    backoff: .exponentialBackoff(maxDelay: 60, multiplier: 2.0),
-	///    initialDelay = 5.0,
-	///    jitter = 0.2
-	/// )
-	/// let task = client.pods.watch(in: .default, retryStrategy: strategy) { (event, pod) in print(pod) }
-	/// ```
-	///
-	/// - Parameters:
-	///   - namespace: The namespace for this API request.
-	///     - options: A list of `ReadOptions` to apply to this request.
-	///     - retryStrategy: A strategy to control the reconnect behaviour.
-	///     - delegate: An ResourceWatcherDelegate instance, which is used as a callback for new events.
-	///          The clients sends each event paired with the corresponding resource as a pair to the `eventHandler`.
-	///          Errors are sent to the `errorHandler`.
-	///
-	/// - Returns: A cancellable `HTTPClient.Task` instance, representing a streaming connetion to the API server.
-	func watch<Delegate: ResourceWatcherDelegate>(
-		in namespace: NamespaceSelector? = nil,
-		options: [ListOption]? = nil,
-		retryStrategy: RetryStrategy = RetryStrategy(),
-		delegate: Delegate
-	) throws -> SwiftkubeClientTask where Delegate.Resource == Resource {
+		retryStrategy: RetryStrategy = RetryStrategy()
+	) throws -> SwiftkubeClientTask<WatchEvent<Resource>> {
 		try super.watch(
 			in: namespace ?? .namespace(config.namespace),
 			options: options,
-			retryStrategy: retryStrategy,
-			using: delegate
+			retryStrategy: retryStrategy
 		)
 	}
 }
@@ -140,13 +110,14 @@ public extension NamespacedGenericKubernetesClient where Resource: ListableResou
 
 	/// Lists API resources in the given namespace.
 	///
-	/// If the namespace is not specified then the default namespace defined in the `KubernetesClientConfig` will be used instead.
+	/// If the namespace is not specified then the default namespace defined in the ``KubernetesClientConfig`` will be used instead.
 	///
 	/// - Parameters:
 	///   - namespace: The namespace for this API request.
-	///   - options: `ListOptions` instance to control the behaviour of the `List` operation.
+	///   - options: ``ListOptions`` instance to control the behaviour of the `List` operation.
 	///
-	/// - Returns: A `KubernetesAPIResourceList` of resources.
+	/// - Returns: A ``KubernetesAPIResourceList`` of resources.
+	/// - Throws: An error of type ``SwiftkubeClientError``.
 	func list(in namespace: NamespaceSelector? = nil, options: [ListOption]? = nil) async throws -> Resource.List {
 		try await super.list(in: namespace ?? .namespace(config.namespace), options: options)
 	}
@@ -159,26 +130,28 @@ public extension NamespacedGenericKubernetesClient where Resource: CreatableReso
 
 	/// Creates an API resource in the given namespace.
 	///
-	/// If the namespace is not specified then the default namespace defined in the `KubernetesClientConfig` will be used instead.
+	/// If the namespace is not specified then the default namespace defined in the ``KubernetesClientConfig`` will be used instead.
 	///
 	/// - Parameters:
 	///   - namespace: The namespace for this API request.
-	///   - resource: A `KubernetesAPIResource` instance to create.
+	///   - resource: A ``KubernetesAPIResource`` instance to create.
 	///
-	/// - Returns: The created `KubernetesAPIResource`.
+	/// - Returns: The created ``KubernetesAPIResource``.
+	/// - Throws: An error of type ``SwiftkubeClientError``.
 	func create(inNamespace namespace: NamespaceSelector? = nil, _ resource: Resource) async throws -> Resource {
 		try await super.create(in: namespace ?? .namespace(config.namespace), resource)
 	}
 
 	/// Creates an API resource in the given namespace.
 	///
-	/// If the namespace is not specified then the default namespace defined in the `KubernetesClientConfig` will be used instead.
+	/// If the namespace is not specified then the default namespace defined in the ``KubernetesClientConfig`` will be used instead.
 	///
 	/// - Parameters:
 	///   - namespace: The namespace for this API request.
-	///   - block: A closure block, which creates a `KubernetesAPIResource` instance to send to the server.
+	///   - block: A closure block, which creates a ``KubernetesAPIResource`` instance to send to the server.
 	///
-	/// - Returns: The created `KubernetesAPIResource`.
+	/// - Returns: The created ``KubernetesAPIResource``.
+	/// - Throws: An error of type ``SwiftkubeClientError``.
 	func create(inNamespace namespace: NamespaceSelector? = nil, _ block: () -> Resource) async throws -> Resource {
 		try await super.create(in: namespace ?? .namespace(config.namespace), block())
 	}
@@ -191,13 +164,14 @@ public extension NamespacedGenericKubernetesClient where Resource: ReplaceableRe
 
 	/// Replaces, i.e. updates, an API resource with the given instance in the given namespace.
 	///
-	/// If the namespace is not specified then the default namespace defined in the `KubernetesClientConfig` will be used instead.
+	/// If the namespace is not specified then the default namespace defined in the ``KubernetesClientConfig`` will be used instead.
 	///
 	/// - Parameters:
 	///   - namespace: The namespace for this API request.
-	///   - resource: A `KubernetesAPIResource` instance to update.
+	///   - resource: A ``KubernetesAPIResource`` instance to update.
 	///
-	/// - Returns: The updated `KubernetesAPIResource`.
+	/// - Returns: The created ``KubernetesAPIResource``.
+	/// - Throws: An error of type ``SwiftkubeClientError``.
 	func update(inNamespace namespace: NamespaceSelector? = nil, _ resource: Resource) async throws -> Resource {
 		try await super.update(in: namespace ?? .namespace(config.namespace), resource)
 	}
@@ -210,14 +184,15 @@ public extension NamespacedGenericKubernetesClient where Resource: DeletableReso
 
 	/// Deletes an API resource by its name in the given namespace.
 	///
-	/// If the namespace is not specified then the default namespace defined in the `KubernetesClientConfig` will be used instead.
+	/// If the namespace is not specified then the default namespace defined in the ``KubernetesClientConfig`` will be used instead.
 	///
 	/// - Parameters:
 	///   - namespace: The namespace for this API request.
-	///   - name: The name of the resource.
-	///   - options: An instnace of `meta.v1.DeleteOptions` to control the behaviour of the `Delete` operation.
+	///   - name: The name of the resource object to delete.
+	///   - options: ``DeleteOptions`` to apply to this request.
 	///
-	/// - Returns: A `ResourceOrStatus` instance.
+	/// - Returns: The created ``KubernetesAPIResource`
+	/// - Throws: An error of type ``SwiftkubeClientError``.
 	func delete(inNamespace namespace: NamespaceSelector? = nil, name: String, options: meta.v1.DeleteOptions? = nil) async throws {
 		try await super.delete(in: namespace ?? .namespace(config.namespace), name: name, options: options)
 	}
@@ -230,11 +205,12 @@ public extension NamespacedGenericKubernetesClient where Resource: CollectionDel
 
 	/// Deletes all API resources in the given namespace.
 	///
-	/// If the namespace is not specified then the default namespace defined in the `KubernetesClientConfig` will be used instead.
+	/// If the namespace is not specified then the default namespace defined in the ``KubernetesClientConfig`` will be used instead.
 	///
 	/// - Parameter namespace: The namespace for this API request.
 	///
-	/// - Returns: A `ResourceOrStatus` instance.
+	/// - Returns: A ``ResourceOrStatus`` instance.
+	/// - Throws: An error of type ``SwiftkubeClientError``.
 	func deleteAll(inNamespace namespace: NamespaceSelector? = nil) async throws {
 		try await super.deleteAll(in: namespace ?? .namespace(config.namespace))
 	}
@@ -245,29 +221,31 @@ public extension NamespacedGenericKubernetesClient where Resource: CollectionDel
 /// API functions for `StatusHavingResource`.
 public extension NamespacedGenericKubernetesClient where Resource: StatusHavingResource {
 
-	/// Loads an API resource's status by name in the given namespace.
+	/// Reads a resource's status in the given namespace.
 	///
-	/// If the namespace is not specified then the default namespace defined in the `KubernetesClientConfig` will be used instead.
+	/// If the namespace is not specified then the default namespace defined in the ``KubernetesClientConfig`` will be used instead.
 	///
 	/// - Parameters:
 	///   - namespace: The namespace for this API request.
-	///   - name: The name of the API resource to load.
+	///   - name: The name of the resource to load.
 	///
-	/// - Returns: The API resource specified by the given name in the given namespace.
+	/// - Returns: The ``KubernetesAPIResource``.
+	/// - Throws: An error of type ``SwiftkubeClientError``.
 	func getStatus(in namespace: NamespaceSelector? = nil, name: String) async throws -> Resource {
 		try await super.getStatus(in: namespace ?? .namespace(config.namespace), name: name)
 	}
 
-	/// Replaces, i.e. updates, an API resource's status in the given namespace.
+	/// Replaces the resource's status in the given namespace.
 	///
-	/// If the namespace is not specified then the default namespace defined in the `KubernetesClientConfig` will be used instead.
+	/// If the namespace is not specified then the default namespace defined in the ``KubernetesClientConfig`` will be used instead.
 	///
 	/// - Parameters:
 	///   - namespace: The namespace for this API request.
-	///   - name: The name of the resoruce to update.
-	///   - resource: A `KubernetesAPIResource` instance to update.
+	///   - name: The name of the resource to update.
+	///   - resource: A ``KubernetesAPIResource`` instance to update.
 	///
-	/// - Returns: The updated `KubernetesAPIResource`.
+	/// - Returns: The updated ``KubernetesAPIResource``.
+	/// - Throws: An error of type ``SwiftkubeClientError``.
 	func updateStatus(in namespace: NamespaceSelector? = nil, name: String, _ resource: Resource) async throws -> Resource {
 		try await super.updateStatus(in: namespace ?? .namespace(config.namespace), name: name, resource)
 	}
@@ -278,30 +256,31 @@ public extension NamespacedGenericKubernetesClient where Resource: StatusHavingR
 /// API functions for `ScalableResource`.
 public extension NamespacedGenericKubernetesClient where Resource: ScalableResource {
 
-	/// Loads an API resource's scale by name in the given namespace.
+	/// Reads a resource's scale in the given namespace.
 	///
-	/// If the namespace is not specified then the default namespace defined in the `KubernetesClientConfig` will be used instead.
+	/// If the namespace is not specified then the default namespace defined in the ``KubernetesClientConfig`` will be used instead.
 	///
 	/// - Parameters:
 	///   - namespace: The namespace for this API request.
-	///   - name: The name of the API resource to load.
+	///   - name: The name of the resource to load.
 	///
-	/// - Returns: The `autoscaling.v1.Scale` of the resource specified by the given name in the given namespace.
+	/// - Returns: The ``autoscaling.v1.Scale`` for the desired resource.
+	/// - Throws: An error of type ``SwiftkubeClientError``.
 	func getScale(in namespace: NamespaceSelector? = nil, name: String) async throws -> autoscaling.v1.Scale {
 		try await super.getScale(in: namespace ?? .namespace(config.namespace), name: name)
 	}
 
-	/// Replaces, i.e. updates, an API resource's scale in the given namespace.
+	/// Replaces the resource's scale in the given namespace.
 	///
-	/// If the namespace is not specified then the default namespace defined in the `KubernetesClientConfig` will be used instead.
+	/// If the namespace is not specified then the default namespace defined in the ``KubernetesClientConfig`` will be used instead.
 	///
 	/// - Parameters:
 	///   - namespace: The namespace for this API request.
 	///   - name: The name of the resource to update.
-	///   - scale: An instance of a `autoscaling.v1.Scale` object to apply to the resource.
-	///   - resource: A `autoscaling.v1.Scale` instance to update.
+	///   - scale: An instance of ``autoscaling.v1.Scale`` to replace.
 	///
-	/// - Returns: The updated `autoscaling.v1.Scale`.
+	/// - Returns: The updated ``autoscaling.v1.Scale`` for the desired resource.
+	/// - Throws: An error of type ``SwiftkubeClientError``.
 	func updateScale(in namespace: NamespaceSelector? = nil, name: String, scale: autoscaling.v1.Scale) async throws -> autoscaling.v1.Scale {
 		try await super.updateScale(in: namespace ?? .namespace(config.namespace), name: name, scale: scale)
 	}
