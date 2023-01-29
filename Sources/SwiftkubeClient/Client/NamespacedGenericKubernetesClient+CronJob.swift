@@ -23,14 +23,14 @@ public extension NamespacedGenericKubernetesClient where Resource == batch.v1bet
 	func suspend(
 		in namespace: NamespaceSelector,
 		name: String
-	) throws -> EventLoopFuture<Resource> {
-		try super.suspend(in: namespace, name: name)
+	) async throws -> Resource {
+		return try await super.suspend(in: namespace, name: name)
 	}
 
 	func unsuspend(
 		in namespace: NamespaceSelector,
 		name: String
-	) throws -> EventLoopFuture<Resource> {
-		try super.unsuspend(in: namespace, name: name)
+	) async throws -> Resource {
+		return try await super.unsuspend(in: namespace, name: name)
 	}
 }

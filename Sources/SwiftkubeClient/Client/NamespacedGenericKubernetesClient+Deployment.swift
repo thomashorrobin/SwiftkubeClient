@@ -13,7 +13,7 @@ public extension NamespacedGenericKubernetesClient where Resource == apps.v1.Dep
 	
 	func restartDeployment(
 		in namespace: NamespaceSelector,
-		name: String) throws -> EventLoopFuture<Resource> {
-			try super.restartDeployment(in: namespace, name: name)
+		name: String) async throws -> Resource {
+			return try await super.restartDeployment(in: namespace, name: name)
 	}
 }

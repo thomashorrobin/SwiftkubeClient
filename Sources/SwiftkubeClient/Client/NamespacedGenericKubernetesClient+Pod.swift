@@ -42,8 +42,8 @@ public extension NamespacedGenericKubernetesClient where Resource == core.v1.Pod
 		name: String,
 		container: String? = nil,
 		tailLines: Int? = nil
-	) throws -> EventLoopFuture<String> {
-		try super.logs(
+	) async throws -> String {
+		try await super.logs(
 			in: namespace ?? .namespace(config.namespace),
 			name: name,
 			container: container,
